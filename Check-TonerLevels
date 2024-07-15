@@ -1,0 +1,44 @@
+#The corresponding printers.txt file should include both the printer name (or IP address) and the corresponding OID separated by a Tab
+<#for example:
+printer1_ip	1.3.6.1.2.1.43.11.1.1.9.1
+printer2_ip	1.3.6.1.2.1.43.11.1.1.9.1
+printer3_ip	1.3.6.1.2.1.43.11.1.1.9.1
+#>
+
+# Import the necessary module
+Import-Module SNMP
+
+# Path to the text file containing printer names and their corresponding OIDs
+$printerListFile = "C:\path\to\printers.txt"
+
+# Read the printer names and OIDs from the file into the array $printers, using the tab as the deliminator
+$printers = Get-Content -Path $printerListFile | ForEach-Object {
+    $parts = $_ -split "\t"
+    [PSCustomObject]@{
+        Printer = $parts[0]
+        OID     = $parts[1]
+    }
+}
+
+# Function to get toner level using SNMP
+function Get-TonerLevel {
+    param (
+        [string]$printer,
+        [string]$oid
+    )
+    try {
+        $result = Get-SNMP -ComputerName $printer -CommunityString "public" -OID $oid
+        return $result.Value
+    } catch {
+        Write-Warning "Failed to get toner level for $printer: $_"
+        return $null
+    }
+}
+
+# Iterate through each printer and get the toner level using the function 
+foreach ($printerInfo in $printers) {
+    $tonerLevel = Get-TonerLevel -printer $printerInfo.Printer -oid $printerInfo.OID
+    if ($tonerLevel) {
+        Write-Output "Printer: $printerInfo.Printer - Toner Level: $tonerLevel"
+    }
+}
